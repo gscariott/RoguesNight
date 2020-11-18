@@ -18,6 +18,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <iostream>
 
 // Headers abaixo são específicos de C++
 #include <map>
@@ -47,6 +48,9 @@
 // Headers locais, definidos na pasta "include/"
 #include "utils.h"
 #include "matrices.h"
+
+
+#define PI 3.14159265359
 
 // Estrutura que representa um modelo geométrico carregado a partir de um
 // arquivo ".obj". Veja https://en.wikipedia.org/wiki/Wavefront_.obj_file .
@@ -191,24 +195,30 @@ GLuint g_NumLoadedTextures = 0;
 //Teclas pressionadas pelo usuário
 bool pressed[GLFW_KEY_MENU];
 
+float movement_speed;
+
 void process_movement_input(glm::vec4 camera_view_vector);
 void compute_movement(double delta_t);
+void drawWall(float mtx, float mtz, bool spin, float msx, glm::mat4 model);
+void drawMaze(glm::mat4 model);
+
+//bool intersectionBoxBox (glm::mat4 model, glm::mat4 model);
 
 struct Player {
 
     glm::vec4 last_position_world;
     glm::vec4 position_world;
     glm::vec4 velocity;
-    float movement_speed;
+
 
     Player()
     {
-        last_position_world = glm::vec4(0.0f,1.0f,0.0f,1.0f);
-        position_world      = glm::vec4(1.0f,0.5f,1.0f,1.0f);
-        g_CameraPhi         = 0.0f;
-        g_CameraTheta       = 0.0f;
+        last_position_world = glm::vec4(0.0f,0.0f,0.0f,1.0f);
+        position_world      = glm::vec4(-5.0f,-1.0f,-5.0f,1.0f);
+        g_CameraPhi         = 0.7f;
+        g_CameraTheta       = 4.7f;
         velocity            = glm::vec4(0.0f,0.0f,0.0f,0.0f);
-        movement_speed      = 50;
+        movement_speed      = 5;
     }
 
     void compute_movement(double delta_t)
@@ -234,7 +244,6 @@ struct Player {
 
         velocity = velocity != glm::vec4(0.0,0.0,0.0,0.0) ? velocity / norm(velocity) : velocity;
     }
-
 };
 
 // Personagem do jogador
@@ -320,6 +329,7 @@ int main(int argc, char* argv[])
     // Carregamos duas imagens para serem utilizadas como textura
     LoadTextureImage("../../data/tc-earth_daymap_surface.jpg");      // TextureImage0
     LoadTextureImage("../../data/tc-earth_nightmap_citylights.gif"); // TextureImage1
+    LoadTextureImage("../../data/textures/dungeon_text.jpg");        // TextureImage3
 
     // Construímos a representação de objetos geométricos através de malhas de triângulos
     ObjModel spheremodel("../../data/sphere.obj");
@@ -451,17 +461,16 @@ int main(int argc, char* argv[])
         DrawVirtualObject("bunny");
 
         // Desenhamos o plano do chão
-        model = Matrix_Translate(0.0f,-0.5f,0.0f)
-              * Matrix_Scale(50.0f,1.0f,50.0f);
+        model = Matrix_Translate(0.0f,-2.0f,0.0f)
+              * Matrix_Scale(500.0f,0.1f,500.0f);
         glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(object_id_uniform, PLANE);
         DrawVirtualObject("plane");
 
-        model = Matrix_Translate(0.0f,-0.5f,0.0f)
-              * Matrix_Scale(5.0f,10.0f,5.0f);
-        glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
+        model = Matrix_Translate(0.0f,0.0f,0.0f);
         glUniform1i(object_id_uniform, WALL);
-        DrawVirtualObject("wall");
+
+        drawMaze(model);
 
 
         // Pegamos um vértice com coordenadas de modelo (0.5, 0.5, 0.5, 1) e o
@@ -644,6 +653,7 @@ void LoadShadersFromFiles()
     glUniform1i(glGetUniformLocation(program_id, "TextureImage0"), 0);
     glUniform1i(glGetUniformLocation(program_id, "TextureImage1"), 1);
     glUniform1i(glGetUniformLocation(program_id, "TextureImage2"), 2);
+    glUniform1i(glGetUniformLocation(program_id, "TextureImage3"), 3);
     glUseProgram(0);
 }
 
@@ -1562,6 +1572,36 @@ void PrintObjModelInfo(ObjModel* model)
     printf("\n");
   }
 }
+void drawWall(float mtx, float mtz, bool spin, float msx, glm::mat4 model)
+{
+    float mr = 0;
+    if (spin) mr = PI/2;
 
+    PushMatrix(model);
+        model = model * Matrix_Translate(mtx, 0.0f, mtz)
+                      * Matrix_Rotate_Y(mr)
+                      * Matrix_Scale(msx, 2.0f, 0.3f);
+        glUniformMatrix4fv(model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+        DrawVirtualObject("wall");
+    PopMatrix(model);
+}
+
+void drawMaze(glm::mat4 model)
+{
+    drawWall(0.0f, 0.0f, false, 5.0f, model);
+    drawWall(5.0f, -10.0f, false, 10.0f, model);
+    drawWall(15.0f, -15.0f, true, 15.0f, model);
+    drawWall(20.0f, 0.0f, false, 5.0f, model);
+    drawWall(15.0f, 10.0f, false, 20.0f, model);
+    drawWall(35.0f, -25.0f, true, 35.0f, model);
+    drawWall(25.0f, -20.0f, true, 10.0f, model);
+    drawWall(20.0f, -40.0f, false, 15.0f, model);
+    drawWall(10.0f, -30.0f, false, 5.0f, model);
+    drawWall(5.0f, -20.0f, true, 10.0f, model);
+    drawWall(-5.0f, -35.0f, true, 25.0f, model);
+    drawWall(-5.0f, 5.0f, true, 5.0f, model);
+    drawWall(5.0f, -45.0f, true, 5.0f, model);
+    drawWall(15.0f, -60.0f, false, 20.0f, model);
+}
 // set makeprg=cd\ ..\ &&\ make\ run\ >/dev/null
 // vim: set spell spelllang=pt_br :

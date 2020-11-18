@@ -23,6 +23,8 @@ uniform mat4 projection;
 #define BUNNY  1
 #define PLANE  2
 #define WALL   3
+#define THIEF  4
+
 uniform int object_id;
 
 // Parâmetros da axis-aligned bounding box (AABB) do modelo
@@ -33,6 +35,7 @@ uniform vec4 bbox_max;
 uniform sampler2D TextureImage0;
 uniform sampler2D TextureImage1;
 uniform sampler2D TextureImage2;
+uniform sampler2D TextureImage3;
 
 // O valor de saída ("out") de um Fragment Shader é a cor final do fragmento.
 out vec3 color;
@@ -101,7 +104,7 @@ void main()
         U = (theta + M_PI) / (2 * M_PI);
         V = (fi + M_PI_2)/ (M_PI);
     }
-    else if ( ( object_id == BUNNY ) || ( object_id == WALL ))
+    else if ( ( object_id == BUNNY ) || ( object_id == WALL )|| ( object_id == THIEF ))
     {
         // PREENCHA AQUI as coordenadas de textura do coelho, computadas com
         // projeção planar XY em COORDENADAS DO MODELO. Utilize como referência
