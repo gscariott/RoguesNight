@@ -22,6 +22,7 @@ uniform mat4 projection;
 #define SPHERE 0
 #define BUNNY  1
 #define PLANE  2
+#define WALL   3
 uniform int object_id;
 
 // Parâmetros da axis-aligned bounding box (AABB) do modelo
@@ -35,6 +36,11 @@ uniform sampler2D TextureImage2;
 
 // O valor de saída ("out") de um Fragment Shader é a cor final do fragmento.
 out vec3 color;
+
+    vec3 Kd; // Refletância difusa que será obtida da imagem de textura
+    vec3 Ks; // Refletância especular
+    vec3 Ka; // Refletância ambiente
+    float q; // Expoente especular para o modelo de iluminação de Phong
 
 // Constantes
 #define M_PI   3.14159265358979323846
@@ -95,7 +101,7 @@ void main()
         U = (theta + M_PI) / (2 * M_PI);
         V = (fi + M_PI_2)/ (M_PI);
     }
-    else if ( object_id == BUNNY )
+    else if ( ( object_id == BUNNY ) || ( object_id == WALL ))
     {
         // PREENCHA AQUI as coordenadas de textura do coelho, computadas com
         // projeção planar XY em COORDENADAS DO MODELO. Utilize como referência
