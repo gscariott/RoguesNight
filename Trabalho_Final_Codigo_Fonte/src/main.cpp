@@ -201,8 +201,8 @@ void process_movement_input(glm::vec4 camera_view_vector);
 void compute_movement(double delta_t);
 void drawWall(float mtx, float mtz, bool spin, float msx, glm::mat4 model);
 void drawMaze(glm::mat4 model);
-
-//bool intersectionBoxBox (glm::mat4 model, glm::mat4 model);
+bool collisionPointLine(glm::vec4 point, glm::vec3 line_min, glm::vec3 line_max);
+glm::vec4 BezierCurve(glm::vec4 B0,glm::vec4 B1,glm::vec4 B2,glm::vec4 B3, float t);
 
 struct Player {
 
@@ -218,7 +218,7 @@ struct Player {
         g_CameraPhi         = 0.7f;
         g_CameraTheta       = 4.7f;
         velocity            = glm::vec4(0.0f,0.0f,0.0f,0.0f);
-        movement_speed      = 5;
+        movement_speed      = 50;
     }
 
     void compute_movement(double delta_t)
@@ -327,9 +327,11 @@ int main(int argc, char* argv[])
     LoadShadersFromFiles();
 
     // Carregamos duas imagens para serem utilizadas como textura
-    LoadTextureImage("../../data/tc-earth_daymap_surface.jpg");      // TextureImage0
-    LoadTextureImage("../../data/tc-earth_nightmap_citylights.gif"); // TextureImage1
-    LoadTextureImage("../../data/textures/dungeon_text.jpg");        // TextureImage3
+
+    LoadTextureImage("../../data/textures/dungeon_text.jpg");   // TextureImage0
+    LoadTextureImage("../../data/textures/golem.jpg");          // TextureImage1
+    LoadTextureImage("../../data/textures/bunny.jpg");          // TextureImage2
+    LoadTextureImage("../../data/textures/diamond.jpg");        // TextureImage3
 
     // Construímos a representação de objetos geométricos através de malhas de triângulos
     ObjModel spheremodel("../../data/sphere.obj");
@@ -347,6 +349,14 @@ int main(int argc, char* argv[])
     ObjModel wallmodel("../../data/wall.obj");
     ComputeNormals(&wallmodel);
     BuildTrianglesAndAddToVirtualScene(&wallmodel);
+
+    ObjModel golemmodel("../../data/golem.obj");
+    ComputeNormals(&golemmodel);
+    BuildTrianglesAndAddToVirtualScene(&golemmodel);
+
+    ObjModel diamondmodel("../../data/diamond.obj");
+    ComputeNormals(&diamondmodel);
+    BuildTrianglesAndAddToVirtualScene(&diamondmodel);
 
     if ( argc > 1 )
     {
@@ -373,6 +383,8 @@ int main(int argc, char* argv[])
 
     float previous_time = glfwGetTime();
     float current_time = glfwGetTime();
+
+    float previous_interval = sin(float(glfwGetTime())*0.5f);
 
     // Ficamos em loop, renderizando, até que o usuário feche a janela
     while (!glfwWindowShouldClose(window))
@@ -442,15 +454,44 @@ int main(int argc, char* argv[])
         #define BUNNY  1
         #define PLANE  2
         #define WALL   3
+        #define GOLEM  4
+        #define DIAMOND  5
 
-        /* Desenhamos o modelo da esfera
-        model = Matrix_Translate(-1.0f,0.0f,0.0f)
+        glm::vec4 B0 = glm::vec4(20.0f,-2.2f, -5.0f,1.0f);
+        glm::vec4 B1 = glm::vec4(15.0f,-2.2f,-45.0f,1.0f);
+        glm::vec4 B2 = glm::vec4(35.0f,-2.2f,-45.0f,1.0f);
+        glm::vec4 B3 = glm::vec4(30.0f,-2.2f, -5.0f,1.0f);
+
+
+        float interval = sin(current_time*0.5f);
+
+        float turnGolem2 = interval;
+
+        float turn = 2*PI;
+
+        if(interval < 0.0f) interval *= -1.0f;
+
+        if((interval > 0.0) && (interval < 0.5)) turn =  PI;
+        else if ((interval > 0.5) && (interval < 1.0)) turn = 2*PI;
+
+        float turnGolem = interval - previous_interval;
+
+        if(turnGolem < 0.0f)
+        {
+            if((interval > 0.0) && (interval < 0.5)) turn =  2*PI;
+            else if ((interval > 0.5) && (interval < 1.0)) turn = PI;
+        }
+
+        glm::vec4 TranslateGolem1 = BezierCurve(B0,B1,B2,B3,interval);
+
+        model = Matrix_Translate(TranslateGolem1.x,TranslateGolem1.y+2.0f,TranslateGolem1.z+5.0f)
               * Matrix_Rotate_Z(0.6f)
               * Matrix_Rotate_X(0.2f)
               * Matrix_Rotate_Y(g_AngleY + (float)glfwGetTime() * 0.1f);
+              //* Matrix_Scale();
         glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(object_id_uniform, SPHERE);
-        DrawVirtualObject("sphere");*/
+        DrawVirtualObject("sphere");
 
         model = Matrix_Translate(player->position_world.x,player->position_world.y,player->position_world.z)
               * Matrix_Rotate_Y(g_CameraTheta)
@@ -461,8 +502,8 @@ int main(int argc, char* argv[])
         DrawVirtualObject("bunny");
 
         // Desenhamos o plano do chão
-        model = Matrix_Translate(0.0f,-2.0f,0.0f)
-              * Matrix_Scale(500.0f,0.1f,500.0f);
+        model = Matrix_Translate(15.0f,-2.0f,-25.0f)
+              * Matrix_Scale(20.0f,0.1f,35.0f);
         glUniformMatrix4fv(model_uniform, 1 , GL_FALSE , glm::value_ptr(model));
         glUniform1i(object_id_uniform, PLANE);
         DrawVirtualObject("plane");
@@ -471,6 +512,30 @@ int main(int argc, char* argv[])
         glUniform1i(object_id_uniform, WALL);
 
         drawMaze(model);
+
+
+
+        model = Matrix_Translate(TranslateGolem1.x,TranslateGolem1.y,TranslateGolem1.z)
+              * Matrix_Scale(0.6f,0.6f,0.6f)
+              * Matrix_Rotate_Y(turn);
+        glUniformMatrix4fv(model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+        glUniform1i(object_id_uniform, GOLEM);
+        DrawVirtualObject("golem");
+
+        model = Matrix_Translate(0.0f,-2.0f,turnGolem2* -15.0f)
+              * Matrix_Rotate_Y(PI)
+              * Matrix_Scale(0.6f,0.6f,0.6f);
+        glUniformMatrix4fv(model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+        glUniform1i(object_id_uniform, GOLEM);
+        DrawVirtualObject("golem");
+
+        model = Matrix_Translate(30.0f,0.0f,-55.0f)
+              * Matrix_Rotate_Y(g_AngleY + (float)glfwGetTime() * 0.3f)
+              * Matrix_Scale(1.0f,1.0f,1.0);
+        glUniformMatrix4fv(model_uniform, 1, GL_FALSE, glm::value_ptr(model));
+        glUniform1i(object_id_uniform, DIAMOND);
+        DrawVirtualObject("diamond");
+
 
 
         // Pegamos um vértice com coordenadas de modelo (0.5, 0.5, 0.5, 1) e o
@@ -511,6 +576,7 @@ int main(int argc, char* argv[])
 
         //Atualizamos delta t
         previous_time = current_time;
+        previous_interval = interval;
     }
 
     // Finalizamos o uso dos recursos do sistema operacional
@@ -549,6 +615,9 @@ void LoadTextureImage(const char* filename)
     // Veja slides 95-96 do documento Aula_20_Mapeamento_de_Texturas.pdf
     glSamplerParameteri(sampler_id, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glSamplerParameteri(sampler_id, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
     // Parâmetros de amostragem da textura.
     glSamplerParameteri(sampler_id, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
@@ -882,6 +951,8 @@ void BuildTrianglesAndAddToVirtualScene(ObjModel* model)
     // "Desligamos" o VAO, evitando assim que operações posteriores venham a
     // alterar o mesmo. Isso evita bugs.
     glBindVertexArray(0);
+
+
 }
 
 // Carrega um Vertex Shader de um arquivo GLSL. Veja definição de LoadShader() abaixo.
@@ -1151,8 +1222,8 @@ void CursorPosCallback(GLFWwindow* window, double xpos, double ypos)
     if (g_RightMouseButtonPressed)
     {
         // Deslocamento do cursor do mouse em x e y de coordenadas de tela!
-        float dx = xpos - g_LastCursorPosX;
-        float dy = ypos - g_LastCursorPosY;
+        //float dx = xpos - g_LastCursorPosX;
+        //float dy = ypos - g_LastCursorPosY;
 
         // Atualizamos as variáveis globais para armazenar a posição atual do
         // cursor como sendo a última posição conhecida do cursor.
@@ -1163,8 +1234,8 @@ void CursorPosCallback(GLFWwindow* window, double xpos, double ypos)
     if (g_MiddleMouseButtonPressed)
     {
         // Deslocamento do cursor do mouse em x e y de coordenadas de tela!
-        float dx = xpos - g_LastCursorPosX;
-        float dy = ypos - g_LastCursorPosY;
+        //float dx = xpos - g_LastCursorPosX;
+        //float dy = ypos - g_LastCursorPosY;
 
         // Atualizamos as variáveis globais para armazenar a posição atual do
         // cursor como sendo a última posição conhecida do cursor.
@@ -1574,15 +1645,31 @@ void PrintObjModelInfo(ObjModel* model)
 }
 void drawWall(float mtx, float mtz, bool spin, float msx, glm::mat4 model)
 {
-    float mr = 0;
-    if (spin) mr = PI/2;
+    glm::mat4 mr = Matrix_Scale(msx, 2.0f, 0.3f);
+    if (spin) mr = Matrix_Scale(0.3f, 2.0f, msx);
+
+    float scaleX = msx;
+    if (spin) scaleX = 0.3f;
+    float scaleZ = 0.3f;
+    if (spin) scaleZ = msx;
 
     PushMatrix(model);
         model = model * Matrix_Translate(mtx, 0.0f, mtz)
-                      * Matrix_Rotate_Y(mr)
-                      * Matrix_Scale(msx, 2.0f, 0.3f);
+                      * mr;
         glUniformMatrix4fv(model_uniform, 1, GL_FALSE, glm::value_ptr(model));
         DrawVirtualObject("wall");
+
+    glm::vec3 line_min = {(g_VirtualScene["wall"].bbox_min.x * scaleX) + mtx,
+                           g_VirtualScene["wall"].bbox_min.y ,
+                           (g_VirtualScene["wall"].bbox_min.z * scaleZ)+ mtz};
+
+    glm::vec3 line_max = {(g_VirtualScene["wall"].bbox_max.x * scaleX) + mtx,
+                           g_VirtualScene["wall"].bbox_max.y ,
+                           (g_VirtualScene["wall"].bbox_max.z * scaleZ) + mtz};
+
+    if(collisionPointLine(player->position_world,line_min,line_max))
+        player->position_world = player->last_position_world;
+
     PopMatrix(model);
 }
 
@@ -1603,5 +1690,22 @@ void drawMaze(glm::mat4 model)
     drawWall(5.0f, -45.0f, true, 5.0f, model);
     drawWall(15.0f, -60.0f, false, 20.0f, model);
 }
+
+bool collisionPointLine(glm::vec4 point, glm::vec3 line_min, glm::vec3 line_max)
+{
+    return (((point.x >= line_min.x)&&(point.x <= line_max.x))
+            &&((point.z >= line_min.z)&&(point.z <= line_max.z)));
+}
+
+glm::vec4 BezierCurve(glm::vec4 B0,glm::vec4 B1,glm::vec4 B2,glm::vec4 B3, float t)
+{
+
+    return glm::vec4((pow((1.0f - t),3) * B0.x + 3*t*(pow((1.0f-t),2))*B1.x + 3 * (pow(t,2))*(1.0f-t)*B2.x + pow(t,3) * B3.x),
+                        (pow((1.0f - t),3) * B0.y + 3*t*(pow((1.0f-t),2))*B1.y + 3 * (pow(t,2))*(1.0f-t)*B2.y + pow(t,3) * B3.y),
+                        (pow((1.0f - t),3) * B0.z + 3*t*(pow((1.0f-t),2))*B1.z + 3 * (pow(t,2))*(1.0f-t)*B2.z + pow(t,3) * B3.z),
+                        1.0f);
+}
+
+
 // set makeprg=cd\ ..\ &&\ make\ run\ >/dev/null
 // vim: set spell spelllang=pt_br :
